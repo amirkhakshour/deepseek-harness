@@ -10,6 +10,7 @@ import { WebError } from '@deepseek-ai/dsh-web'
 import type { WebFetchBody, WebFetchProvider, WebFetchRequest, WebFetchResult } from '@deepseek-ai/dsh-web'
 import { deadline, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { Response } from 'undici'
+import { assertPublicDestination } from './destination.ts'
 import { classifyTransportFailure } from './transport-failure.ts'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from './policy.ts'
 
@@ -25,6 +26,8 @@ export interface HttpFetchLimits {
   maxRedirects: number
   /** `User-Agent` header sent on every request. */
   userAgent: string
+  /** Whether loopback, private and link-local destinations are permitted (cloud metadata never is). */
+  allowPrivateDestinations: boolean
 }
 
 /** Stable id this provider registers under. */
@@ -111,6 +114,10 @@ export class HttpFetchProvider implements WebFetchProvider {
 
   /** Send one GET through the process-wide dispatcher, which applies the installed proxy policy. */
   private async requestOnce(url: URL, signal: AbortSignal): Promise<Response> {
+    // Applied per transport attempt, so a redirect hop cannot be a back door to a
+    // metadata or (when disallowed) private destination that the first hop's
+    // validation saw nothing of.
+    await assertPublicDestination(url, { allowPrivate: this.limits.allowPrivateDestinations }, signal)
     const headers = {
       'user-agent': this.limits.userAgent,
       'accept': 'text/html,application/xhtml+xml,text/*;q=0.9,application/json;q=0.8',
