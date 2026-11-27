@@ -34,11 +34,7 @@ import { AUTO_PRESET } from '@deepseek-ai/dsh-permission-presets'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-subagent'
 import type {} from '@deepseek-ai/dsh-user-approval'
-import {
-  RUN_CODE_NAME,
-  type PreToolDecision,
-  type ToolExecution,
-} from '@deepseek-ai/dsh-tools'
+import type { PreToolDecision, ToolExecution } from '@deepseek-ai/dsh-tools'
 import { deniedDisplayReason } from './locales.ts'
 
 /** Structured error name persisted for every final reviewer denial. */
@@ -740,9 +736,13 @@ export function apply(ctx: Context): void {
   ctx.effect(function* () {
     const stopListener = ctx.on('tools/pre-execute', async (exec, next): Promise<PreToolDecision> => {
       const agent = exec.agent
-      if (agent === undefined || (exec.parent === undefined && exec.name === RUN_CODE_NAME)) {
+      if (agent === undefined) {
         return next()
       }
+      // `run_code` used to be exempted here by call identity, so the one call whose
+      // program can do strictly more than `bash` — and whose worker starts with the
+      // preset's fixed `danger-full-access` — was the one call the reviewer never saw.
+      // It is reviewed like any other call; the program body is what gets classified.
       if (permissionPresets.current(agent.session) !== AUTO_PRESET) {
         return next()
       }
