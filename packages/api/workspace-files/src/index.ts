@@ -503,11 +503,14 @@ export class WorkspaceFiles extends TypertRemoteService {
     path: string,
     signal: AbortSignal,
   ): Promise<{ target: FsTarget; info: FsInfo }> {
-    const { workspaceRoot, entry } = await this.inspect(workspaceFileScope, path, signal)
+    const { root, workspaceRoot, entry } = await this.inspect(workspaceFileScope, path, signal)
     if (entry.type !== 'file') {
       throw new RemoteError('workspace-file/not-regular-file', `"${path}" is a ${entry.type}`, { path, kind: entry.type })
     }
-    const target = await this.ctx.fs.resolve(path, { cwd: workspaceRoot, signal })
+    // Every read path is confined: `list`/`search` already refuse an outside path, and a
+    // read that skipped the same gate could be pointed at `~/.ssh/id_ed25519` by any
+    // installed plugin.
+    const target = await this.confine(root, workspaceRoot, path, signal)
     const info = await this.ctx.fs.stat(target, signal)
     if (info === undefined) {
       throw new RemoteError('workspace-file/not-found', `no entry at "${path}"`, { path })
