@@ -22,6 +22,8 @@ const limits: HttpFetchLimits = {
   timeoutMs: 5_000,
   maxRedirects: 5,
   userAgent: 'test-agent/1.0',
+  // The package tests fetch from a loopback server on purpose.
+  allowPrivateDestinations: true,
 }
 
 type Handler = (req: IncomingMessage, res: ServerResponse) => void
